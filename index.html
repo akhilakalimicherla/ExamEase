@@ -1,0 +1,494 @@
+<!--
+ExamEase - Single-file web app
+Contains: index.html with embedded CSS and JS, README, and Project Report (10+ pages content) appended as hidden sections.
+Instructions: Save this file as examease.html and open in a modern browser. Uses localStorage for persistence. Uses Notification API for reminders (requires HTTPS or localhost for permission). Google Calendar sync uses a quick-add link. Export/Import JSON supported.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ExamEase — Smart Study Planner</title>
+  <style>
+    /* Simple, clean styling (Tailwind-like spacing but handcrafted) */
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#94a3b8;--accent:#60a5fa;--accent-2:#7c3aed}
+    *{box-sizing:border-box}
+    body{font-family:Inter,Segoe UI,Roboto,Arial;margin:0;background:linear-gradient(180deg,#071022 0%, #07142a 60%);color:#e6eef8}
+    header{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;border-bottom:1px solid rgba(255,255,255,0.03)}
+    h1{font-size:20px;margin:0}
+    .container{display:grid;grid-template-columns:320px 1fr;gap:18px;padding:20px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:16px;border-radius:12px;box-shadow:0 6px 20px rgba(2,6,23,0.6)}
+    .sidebar .section{margin-bottom:12px}
+    .btn{display:inline-block;padding:8px 12px;border-radius:8px;background:var(--accent);color:#05222f;text-decoration:none;font-weight:600}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted)}
+    .muted{color:var(--muted)}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input,select,textarea{width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    .subject-item{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;margin-bottom:8px}
+    .subject-pill{padding:6px 10px;border-radius:999px;background:rgba(255,255,255,0.03)}
+    .progress-bar{height:12px;background:rgba(255,255,255,0.04);border-radius:8px;overflow:hidden}
+    .progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-2));width:0%}
+    .flex{display:flex;gap:10px;align-items:center}
+    .chips{display:flex;flex-wrap:wrap;gap:8px}
+    .small{font-size:13px}
+    .top-row{display:flex;gap:12px;align-items:center}
+    .calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px}
+    .day{background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;min-height:70px}
+    footer{padding:12px 28px;color:var(--muted);font-size:13px}
+    .chart{width:100%;height:160px;margin-top:12px}
+    /* responsive */
+    @media(max-width:900px){.container{grid-template-columns:1fr;padding:12px}.sidebar{order:2}}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ExamEase — Smart Study Planner</h1>
+    <div class="top-row">
+      <button id="importBtn" class="btn-ghost">Import JSON</button>
+      <button id="exportBtn" class="btn">Export JSON</button>
+    </div>
+  </header>
+  <main class="container">
+    <aside class="sidebar card">
+      <div class="section">
+        <h3>Subjects</h3>
+        <div id="subjectsList"></div>
+        <div style="margin-top:8px">
+          <input id="newSubjectName" placeholder="New subject name">
+          <button id="addSubjectBtn" class="btn" style="margin-top:8px">Add Subject</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Quick Actions</h3>
+        <div class="chips">
+          <button id="suggestBtn" class="btn-ghost small">Get Adaptive Suggestions</button>
+          <button id="addSessionBtn" class="btn small">Add Study Session</button>
+          <button id="viewReportBtn" class="btn-ghost small">View Report</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Motivation</h3>
+        <div id="quoteArea" class="muted small">"Study smart, not just hard."</div>
+        <button id="newQuoteBtn" class="btn-ghost small" style="margin-top:8px">New Quote</button>
+      </div>
+
+      <div class="section">
+        <h3>Sync</h3>
+        <p class="muted small">Quick calendar sync (creates Google Calendar event link to open in new tab)</p>
+        <button id="syncCalBtn" class="btn small">Sync Next Reminder to Google Calendar</button>
+      </div>
+
+    </aside>
+
+    <section class="main-area">
+      <div class="card">
+        <h2>Dashboard</h2>
+        <div style="display:flex;gap:18px;margin-top:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:260px">
+            <h4>Today's Plan</h4>
+            <div id="todayList"></div>
+          </div>
+          <div style="flex:1;min-width:260px">
+            <h4>Progress Overview</h4>
+            <div id="progressOverview"></div>
+          </div>
+          <div style="flex:1;min-width:260px">
+            <h4>Weekly Analytics</h4>
+            <canvas id="weeklyChart" class="chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h3>Calendar (7-day)</h3>
+        <div class="calendar" id="calendar"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h3>All Study Sessions</h3>
+        <div id="sessionsList"></div>
+      </div>
+
+    </section>
+  </main>
+
+  <footer>ExamEase • Save data locally using localStorage • Notifications require permission and work while page is open (or on localhost/https for push)</footer>
+
+  <!-- Modals & hidden inputs -->
+  <div id="modalRoot"></div>
+
+  <script>
+    /**********************
+     * Data Model
+     **********************/
+    const STORAGE_KEY = 'examease_v1';
+    const defaultState = {
+      subjects: [], // {id,name,color,examDate,syllabusHours,progressPercent}
+      sessions: [], // {id,subjectId,title,dateISO,durationMins,done}
+      reminders: [], // {id,sessionId,timeISO,notified}
+      quotes: [
+        "Small steps every day lead to big changes.",
+        "Focus on progress, not perfection.",
+        "Plan the work, then work the plan.",
+        "Break big tasks into small wins."
+      ]
+    };
+
+    function uid(prefix='id'){return prefix + Math.random().toString(36).slice(2,9)}
+
+    function loadState(){
+      try{const raw=localStorage.getItem(STORAGE_KEY);return raw?JSON.parse(raw):structuredClone(defaultState)}catch(e){console.error(e);return structuredClone(defaultState)}
+    }
+    function saveState(state){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
+
+    let state = loadState();
+
+    /**********************
+     * Utility
+     **********************/
+    function formatDate(d){const dt=new Date(d);return dt.toLocaleString()}
+    function formatDateShort(d){const dt=new Date(d);return dt.toLocaleString([], {weekday:'short', month:'short', day:'numeric'})}
+
+    function findSubject(id){return state.subjects.find(s=>s.id===id)}
+
+    /**********************
+     * UI render
+     **********************/
+    const subjectsList = document.getElementById('subjectsList');
+    const addSubjectBtn = document.getElementById('addSubjectBtn');
+    const newSubjectName = document.getElementById('newSubjectName');
+    const todayList = document.getElementById('todayList');
+    const progressOverview = document.getElementById('progressOverview');
+    const sessionsList = document.getElementById('sessionsList');
+    const calendarEl = document.getElementById('calendar');
+    const modalRoot = document.getElementById('modalRoot');
+
+    function renderSubjects(){
+      subjectsList.innerHTML='';
+      if(state.subjects.length===0){subjectsList.innerHTML='<div class="muted small">No subjects yet. Add one!</div>';return}
+      state.subjects.forEach(s=>{
+        const div = document.createElement('div');div.className='subject-item';
+        div.innerHTML = `<div><div class="subject-pill"><strong>${s.name}</strong></div><div class="muted small">Exam: ${s.examDate?formatDateShort(s.examDate):'Not set'}</div></div>
+          <div style="text-align:right"><button class="btn-ghost small" data-action="edit" data-id="${s.id}">Edit</button> <button class="btn small" data-action="del" data-id="${s.id}">Delete</button></div>`;
+        subjectsList.appendChild(div);
+      })
+    }
+
+    function renderDashboard(){
+      // Today's plan: sessions for today
+      const today = new Date();
+      const dayStr = new Date(today.getFullYear(),today.getMonth(),today.getDate()).toISOString();
+      todayList.innerHTML='';
+      const todays = state.sessions.filter(ss=>{const d=new Date(ss.dateISO);return d.toDateString()===today.toDateString()});
+      if(todays.length===0){todayList.innerHTML='<div class="muted small">No sessions scheduled for today. Add some!</div>'} else {
+        todays.forEach(s=>{
+          const sub = findSubject(s.subjectId);
+          const div=document.createElement('div');div.className='subject-item';
+          div.innerHTML=`<div><strong>${s.title}</strong><div class="muted small">${sub?sub.name:'Unknown'} • ${formatDate(s.dateISO)} • ${s.durationMins} mins</div></div>
+            <div><button class="btn-ghost small" data-action="toggleSession" data-id="${s.id}">${s.done? 'Mark undone':'Mark done'}</button></div>`;
+          todayList.appendChild(div);
+        })
+      }
+
+      // Progress overview
+      progressOverview.innerHTML='';
+      if(state.subjects.length===0){progressOverview.innerHTML='<div class="muted small">Add subjects to see progress</div>'}
+      state.subjects.forEach(sub=>{
+        const container=document.createElement('div');container.style.marginBottom='8px';
+        const percent = sub.progressPercent || calculateProgressForSubject(sub.id);
+        container.innerHTML=`<div style="display:flex;justify-content:space-between"><div>${sub.name}</div><div class="muted">${Math.round(percent)}%</div></div>
+          <div class="progress-bar" aria-valuenow="${percent}"><div class="progress-fill" style="width:${percent}%"></div></div>`;
+        progressOverview.appendChild(container);
+      })
+
+      // Sessions list
+      renderSessions();
+      renderCalendar();
+      renderChart();
+    }
+
+    function renderSessions(){
+      sessionsList.innerHTML='';
+      if(state.sessions.length===0){sessionsList.innerHTML='<div class="muted small">No sessions scheduled yet.</div>';return}
+      state.sessions.slice().sort((a,b)=>new Date(a.dateISO)-new Date(b.dateISO)).forEach(s=>{
+        const sub=findSubject(s.subjectId);
+        const div=document.createElement('div');div.className='subject-item';
+        div.innerHTML=`<div><strong>${s.title}</strong><div class="muted small">${sub?sub.name:'-'} • ${formatDate(s.dateISO)} • ${s.durationMins} mins</div></div>
+          <div><div style="display:flex;flex-direction:column;gap:6px"><div><button class="btn-ghost small" data-action="editSession" data-id="${s.id}">Edit</button> <button class="btn small" data-action="delSession" data-id="${s.id}">Delete</button></div><button class="btn small" data-action="syncCal" data-id="${s.id}">Add to Calendar</button></div></div>`;
+        sessionsList.appendChild(div);
+      })
+    }
+
+    function renderCalendar(){
+      calendarEl.innerHTML='';
+      const start = new Date(); start.setHours(0,0,0,0);
+      for(let i=0;i<7;i++){
+        const d = new Date(start); d.setDate(start.getDate()+i);
+        const dayBox = document.createElement('div');dayBox.className='day';
+        dayBox.innerHTML=`<div style="font-weight:600">${d.toLocaleDateString([], {weekday:'short', day:'numeric'})}</div>`;
+        const items = state.sessions.filter(s=> new Date(s.dateISO).toDateString()===d.toDateString());
+        items.forEach(it=>{
+          const sub=findSubject(it.subjectId);
+          const p=document.createElement('div');p.style.marginTop='6px';p.innerHTML=`<div style="font-size:13px"><strong>${it.title}</strong></div><div class="muted small">${sub?sub.name:'-'} • ${it.durationMins}m</div>`;
+          dayBox.appendChild(p);
+        });
+        calendarEl.appendChild(dayBox);
+      }
+    }
+
+    /**********************
+     * Interactions
+     **********************/
+    addSubjectBtn.addEventListener('click', ()=>{
+      const name = newSubjectName.value.trim(); if(!name){alert('Enter subject name');return}
+      const s = {id:uid('sub'),name,examDate:null,syllabusHours:10,progressPercent:0};
+      state.subjects.push(s); saveState(state); newSubjectName.value=''; renderSubjects(); renderDashboard();
+    });
+
+    subjectsList.addEventListener('click', (e)=>{
+      const btn = e.target.closest('button'); if(!btn) return; const action = btn.dataset.action; const id = btn.dataset.id;
+      if(action==='del'){ if(confirm('Delete subject and its sessions?')){state.subjects=state.subjects.filter(s=>s.id!==id); state.sessions=state.sessions.filter(ss=>ss.subjectId!==id); saveState(state); renderSubjects(); renderDashboard();}}
+      if(action==='edit'){openEditSubjectModal(id)}
+    });
+
+    todayList.addEventListener('click',(e)=>{const btn=e.target.closest('button'); if(!btn) return; const id=btn.dataset.id; const action=btn.dataset.action; if(action==='toggleSession'){const s=state.sessions.find(x=>x.id===id); s.done=!s.done; saveState(state); renderDashboard();}}
+    );
+
+    sessionsList.addEventListener('click',(e)=>{const btn=e.target.closest('button'); if(!btn) return; const action=btn.dataset.action; const id=btn.dataset.id; if(action==='delSession'){if(confirm('Delete session?')){state.sessions=state.sessions.filter(s=>s.id!==id); saveState(state); renderDashboard();}} if(action==='editSession'){openEditSessionModal(id)} if(action==='syncCal'){const ses=state.sessions.find(s=>s.id===id); openGoogleCalendarForSession(ses)} });
+
+    document.getElementById('addSessionBtn').addEventListener('click', ()=>openAddSessionModal());
+    document.getElementById('suggestBtn').addEventListener('click', ()=>showSuggestions());
+    document.getElementById('newQuoteBtn').addEventListener('click', ()=>{const q = state.quotes[Math.floor(Math.random()*state.quotes.length)]; document.getElementById('quoteArea').innerText='"'+q+'"';});
+
+    document.getElementById('exportBtn').addEventListener('click', ()=>{
+      const dataStr = JSON.stringify(state, null, 2); const blob = new Blob([dataStr], {type:'application/json'}); const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download='examease_export.json'; a.click(); URL.revokeObjectURL(url);
+    });
+    document.getElementById('importBtn').addEventListener('click', ()=>{
+      const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json'; inp.onchange=e=>{const f=e.target.files[0]; const reader=new FileReader(); reader.onload=ev=>{try{state=JSON.parse(ev.target.result); saveState(state); renderSubjects(); renderDashboard();alert('Imported!')}catch(err){alert('Invalid file')}}; reader.readAsText(f)}; inp.click();
+    });
+
+    document.getElementById('syncCalBtn').addEventListener('click', ()=>{
+      const next = getNextReminder(); if(!next){alert('No upcoming reminders found.');return} openGoogleCalendarForSession(next.session);
+    });
+
+    /**********************
+     * Modals
+     **********************/
+    function openModal(html){modalRoot.innerHTML=`<div style="position:fixed;inset:0;background:rgba(2,6,23,0.6);display:flex;align-items:center;justify-content:center;padding:12px;z-index:999"><div style="width:720px;max-width:98%;">${html}<div style="text-align:right;margin-top:8px"><button id="closeModalBtn" class="btn-ghost">Close</button></div></div></div>`;document.getElementById('closeModalBtn').addEventListener('click', ()=>{modalRoot.innerHTML=''});
+    }
+
+    function openAddSessionModal(){
+      if(state.subjects.length===0){alert('Add at least one subject first');return}
+      const subjectOptions = state.subjects.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+      openModal(`<div class="card" style="padding:14px;background:var(--card)"><h3>Add Study Session</h3>
+        <label>Title<input id="sessTitle"></label>
+        <label>Subject<select id="sessSub">${subjectOptions}</select></label>
+        <label>Date & Time<input id="sessDate" type="datetime-local"></label>
+        <label>Duration (mins)<input id="sessDuration" type="number" value="60"></label>
+        <label>Reminder before (mins)<input id="sessReminder" type="number" value="30"></label>
+        <div style="display:flex;gap:8px;margin-top:8px"><button id="saveSessBtn" class="btn">Save</button><button id="saveAndAddBtn" class="btn-ghost">Save & Add Another</button></div></div>`);
+      document.getElementById('saveSessBtn').addEventListener('click', ()=>{saveNewSession(false)});
+      document.getElementById('saveAndAddBtn').addEventListener('click', ()=>{saveNewSession(true)});
+
+      function saveNewSession(keepOpen){
+        const title=document.getElementById('sessTitle').value.trim(); const subjectId=document.getElementById('sessSub').value; const date=document.getElementById('sessDate').value; const duration=Number(document.getElementById('sessDuration').value)||60; const reminderMins=Number(document.getElementById('sessReminder').value)||30;
+        if(!title||!date){alert('Enter title and date'); return}
+        const s={id:uid('sess'),subjectId,title,dateISO:new Date(date).toISOString(),durationMins:duration,done:false};
+        state.sessions.push(s);
+        // add reminder
+        const rem={id:uid('rem'),sessionId:s.id,timeISO:new Date(new Date(date).getTime()-reminderMins*60000).toISOString(),notified:false};
+        state.reminders.push(rem);
+        saveState(state); renderDashboard(); scheduleReminder(rem);
+        if(keepOpen){document.getElementById('sessTitle').value='';} else {modalRoot.innerHTML=''}
+      }
+    }
+
+    function openEditSubjectModal(id){
+      const s = state.subjects.find(x=>x.id===id); if(!s) return; openModal(`<div class="card"><h3>Edit Subject</h3>
+        <label>Name<input id="edName" value="${s.name}"></label>
+        <label>Exam Date<input id="edExam" type="date" value="${s.examDate?new Date(s.examDate).toISOString().slice(0,10):''}"></label>
+        <label>Syllabus hours required<input id="edHours" type="number" value="${s.syllabusHours||10}"></label>
+        <div style="display:flex;gap:8px;margin-top:8px"><button id="saveSubBtn" class="btn">Save</button></div></div>`);
+      document.getElementById('saveSubBtn').addEventListener('click', ()=>{s.name=document.getElementById('edName').value; s.examDate=document.getElementById('edExam').value?new Date(document.getElementById('edExam').value).toISOString():null; s.syllabusHours=Number(document.getElementById('edHours').value)||10; saveState(state); modalRoot.innerHTML=''; renderSubjects(); renderDashboard();});
+    }
+
+    function openEditSessionModal(id){
+      const s = state.sessions.find(x=>x.id===id); if(!s)return; const subjectOptions = state.subjects.map(sub=>`<option value="${sub.id}" ${sub.id===s.subjectId?'selected':''}>${sub.name}</option>`).join('');
+      openModal(`<div class="card"><h3>Edit Session</h3>
+        <label>Title<input id="edTitle" value="${s.title}"></label>
+        <label>Subject<select id="edSub">${subjectOptions}</select></label>
+        <label>Date & Time<input id="edDate" type="datetime-local" value="${new Date(s.dateISO).toISOString().slice(0,16)}"></label>
+        <label>Duration (mins)<input id="edDur" type="number" value="${s.durationMins}"></label>
+        <div style="display:flex;gap:8px;margin-top:8px"><button id="saveEditSessBtn" class="btn">Save</button></div></div>`);
+      document.getElementById('saveEditSessBtn').addEventListener('click', ()=>{s.title=document.getElementById('edTitle').value; s.subjectId=document.getElementById('edSub').value; s.dateISO=new Date(document.getElementById('edDate').value).toISOString(); s.durationMins=Number(document.getElementById('edDur').value)||60; saveState(state); modalRoot.innerHTML=''; renderDashboard();});
+    }
+
+    /**********************
+     * Reminders & Notifications
+     **********************/
+    function scheduleAllReminders(){
+      state.reminders.forEach(r=>scheduleReminder(r))
+    }
+    function scheduleReminder(rem){
+      try{
+        const now = Date.now(); const t = new Date(rem.timeISO).getTime(); const delay = t - now;
+        if(delay<=0){ // past
+          // ignore; will be shown on next load if not notified
+          return;
+        }
+        // For demo: use setTimeout while page is open
+        setTimeout(()=>{showInPageNotification(rem)}, Math.min(delay, 2147483647));
+      }catch(e){console.error(e)}
+    }
+
+    function showInPageNotification(rem){
+      const session = state.sessions.find(s=>s.id===rem.sessionId); if(!session) return;
+      // browser notification
+      if(Notification && Notification.permission==='granted'){
+        const n = new Notification('ExamEase Reminder', {body: `${session.title} • ${findSubject(session.subjectId)?.name || ''} at ${new Date(session.dateISO).toLocaleString()}`});
+        n.onclick = ()=>window.focus();
+      } else {
+        alert(`Reminder: ${session.title} (Subject: ${findSubject(session.subjectId)?.name}) at ${formatDate(session.dateISO)}`)
+      }
+      rem.notified=true; saveState(state);
+    }
+
+    // ask permission for notifications
+    if('Notification' in window && Notification.permission!=='granted' && Notification.permission!=='denied'){
+      Notification.requestPermission().then(p=>console.log('Notification permission',p));
+    }
+
+    // show reminders not yet notified that are past
+    function showDueReminders(){
+      const now = Date.now(); state.reminders.filter(r=>!r.notified && new Date(r.timeISO).getTime()<=now).forEach(r=>showInPageNotification(r));
+    }
+
+    // helper to return next reminder for sync
+    function getNextReminder(){
+      const upcoming = state.reminders.filter(r=>new Date(r.timeISO).getTime()>Date.now()).sort((a,b)=>new Date(a.timeISO)-new Date(b.timeISO));
+      if(upcoming.length===0) return null; const rem=upcoming[0]; return {rem, session:state.sessions.find(s=>s.id===rem.sessionId)};
+    }
+
+    function openGoogleCalendarForSession(s){
+      if(!s) return alert('Session not found');
+      const start = new Date(s.dateISO); const end = new Date(start.getTime()+s.durationMins*60000);
+      const fmt=(d)=>{return d.toISOString().replace(/-|:|\.\d+/g,'')};
+      const title = encodeURIComponent(s.title+' — '+(findSubject(s.subjectId)?.name||''));
+      const details = encodeURIComponent('Planned with ExamEase');
+      const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${fmt(start)}/${fmt(end)}&details=${details}`;
+      window.open(url,'_blank');
+    }
+
+    /**********************
+     * Adaptive suggestions (simple heuristic)
+     **********************/
+    function showSuggestions(){
+      // compute urgency: based on examDate proximity and syllabusHours left vs available days
+      const suggestions = [];
+      const today = new Date();
+      state.subjects.forEach(sub=>{
+        const exam = sub.examDate? new Date(sub.examDate) : null;
+        const daysLeft = exam? Math.max(1, Math.ceil((exam - today)/(1000*60*60*24))) : 30;
+        // pending hours estimate: syllabusHours * (1 - progress)
+        const progress = calculateProgressForSubject(sub.id)/100;
+        const pendingHours = Math.max(0, (sub.syllabusHours||10) * (1-progress));
+        // recommended daily minutes = pendingHours*60 / daysLeft, but cap
+        const recommendedMins = Math.min(8*60, Math.ceil((pendingHours*60)/daysLeft));
+        suggestions.push({subject:sub.name,daysLeft,pendingHours,recommendedMins,exam:sub.examDate});
+      });
+
+      const html = `<div class="card"><h3>Adaptive Suggestions</h3>
+        <p class="muted small">This recommendation uses exam dates and remaining syllabus hours to suggest daily time (approx).</p>
+        <div style="margin-top:8px">${suggestions.map(s=>`<div style="margin-bottom:8px"><strong>${s.subject}</strong> — ${s.pendingHours.toFixed(1)}h pending • ${s.daysLeft} days left • <span class="muted">Recommend ~ ${s.recommendedMins} mins/day</span></div>`).join('')}</div>
+        <div style="margin-top:8px"><button id="applySuggestionBtn" class="btn">Apply: create plan for next 7 days</button></div></div>`;
+      openModal(html);
+      document.getElementById('applySuggestionBtn').addEventListener('click', ()=>{
+        // create simple sessions for next 7 days per suggestion
+        const start = new Date(); for(let d=0;d<7;d++){ const day = new Date(start); day.setDate(start.getDate()+d); suggestions.forEach(sugg=>{
+          const subj = state.subjects.find(x=>x.name===sugg.subject);
+          const title = `Study: ${sugg.subject}`;
+          const session = {id:uid('sess'),subjectId:subj.id,title,dateISO:new Date(day.getFullYear(),day.getMonth(),day.getDate(),18,0,0).toISOString(),durationMins:Math.max(20, Math.round(sugg.recommendedMins/1)) , done:false};
+          state.sessions.push(session);
+          // add a reminder 30 mins before
+          state.reminders.push({id:uid('rem'),sessionId:session.id,timeISO:new Date(new Date(session.dateISO).getTime()-30*60000).toISOString(),notified:false});
+        })}
+        saveState(state); renderDashboard(); modalRoot.innerHTML=''; scheduleAllReminders(); alert('Created a simple 7-day plan. Edit sessions as needed.');
+      })
+    }
+
+    /**********************
+     * Progress calculation and analytics
+     **********************/
+    function calculateProgressForSubject(subId){
+      // simple metric: minutes logged as done / syllabusHours*60
+      const sessionsDone = state.sessions.filter(s=>s.subjectId===subId && s.done);
+      const mins = sessionsDone.reduce((a,b)=>a+b.durationMins,0);
+      const subj = findSubject(subId);
+      const total = (subj?.syllabusHours||10)*60;
+      const pct = Math.min(100, total===0?0:(mins/total*100));
+      subj.progressPercent = pct;
+      return pct;
+    }
+
+    function renderChart(){
+      const canvas = document.getElementById('weeklyChart'); const ctx = canvas.getContext('2d'); canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight;
+      // build data: last 7 days total minutes
+      const labels=[]; const data=[];
+      const start = new Date(); start.setHours(0,0,0,0);
+      for(let i=6;i>=0;i--){ const d=new Date(start); d.setDate(start.getDate()-i); labels.push(d.toLocaleDateString([], {weekday:'short'})); const total = state.sessions.filter(s=>new Date(s.dateISO).toDateString()===d.toDateString() && s.done).reduce((a,b)=>a+b.durationMins,0); data.push(total); }
+      // clear
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      // simple bar chart
+      const max = Math.max(60, ...data);
+      const barW = canvas.width/(data.length*2);
+      data.forEach((val,i)=>{
+        const h = (val/max)* (canvas.height-20);
+        const x = i*(barW*2) + barW/2;
+        ctx.fillStyle = '#60a5fa';
+        ctx.fillRect(x, canvas.height-10-h, barW, h);
+        ctx.fillStyle='#e6eef8'; ctx.font='11px sans-serif'; ctx.fillText(labels[i], x, canvas.height-2);
+      })
+    }
+
+    /**********************
+     * Startup
+     **********************/
+    renderSubjects(); renderDashboard(); scheduleAllReminders(); showDueReminders();
+
+    // small helper to find next reminder and open calendar
+
+    // END
+  </script>
+
+  <!-- README & Project Report (visible as downloadable content inside file) -->
+  <!-- README START -->
+  <!--
+  README - ExamEase
+  ==================
+
+  Overview
+  --------
+  ExamEase is a single-file demo web app (examease.html) that provides a smart study planner. It is intended for demonstration and as a starting point for a full project.
+
+  Features
+  --------
+  - Create and manage multiple subjects
+  - Add study sessions with date/time and duration
+  - Set reminders (local, while page is open). Uses Notification API when available.
+  - Track daily/weekly progress visually (progress bars and a simple weekly chart)
+  - Adaptive time allocation suggestions based on exam date and syllabus hours
+  - Store data in localStorage (export/import JSON supported)
+  - Quick sync to Google Calendar via event link
+  - Motivational quotes, simple analytics
+
+  How to run
+  ----------
+  1. Save the file as examease.html
+  2. Open it in a modern browser (Chrome/Edge/Firefox). For Notification API permission, serve over HTTPS or run from localhost.
+
+  Files
+  -----
+  This single file contains all HTML/CSS/JS. For produc
